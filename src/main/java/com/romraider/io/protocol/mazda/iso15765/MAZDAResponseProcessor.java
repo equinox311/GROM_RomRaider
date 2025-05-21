@@ -55,12 +55,17 @@ public final class MAZDAResponseProcessor {
         assertEquals(module.getAddress(), response, "Invalid " +
                 module.getName() + " id");
         if (response[4] == NCS_NRC) {
-            assertNrc(NCS_NRC, response[4], response[5], response[6], "Request type not supported");
+            if(response[6] == 0x78){
+                //Handle this at some point
+            }else{
+                assertNrc(NCS_NRC, response[4], response[5], response[6], "Request type not supported");
+            }
+
         }
         assertOneOf(new byte[]{ECU_INIT_RESPONSE, ECU_ID_SID_RESPONSE,
                 READ_SID_21_RESPONSE, READ_SID_GRP_RESPONSE,
                 READ_MEMORY_RESPONSE, LOAD_ADDRESS_RESPONSE,
-                READ_LOAD_RESPONSE}, response[4], "Invalid response code");
+                READ_LOAD_RESPONSE,NCS_NRC}, response[4], "Invalid response code");
     }
 
     public static byte[] extractResponseData(byte[] response) {
@@ -86,6 +91,8 @@ public final class MAZDAResponseProcessor {
         }
         else if (response[4] == READ_LOAD_RESPONSE) {
             nonDataLength = RESPONSE_NON_DATA_BYTES + 2;
+        }else if(response[4] == NCS_NRC){           //This is a shitty hack to get the data to not request an error
+            nonDataLength = RESPONSE_NON_DATA_BYTES + 3;
         }
         data = new byte[response.length - nonDataLength];
         System.arraycopy(response, nonDataLength, data, 0, data.length);
@@ -120,6 +127,10 @@ public final class MAZDAResponseProcessor {
             }
             if (code == 0x22) {
                 ec = "conditions not correct or request sequence error.";
+            }
+            //Added this in because of errors I saw at higher ECU useage, not sure how it will parse
+            if (code == 0x78) {
+                ec = "request recieved, wait for response.";
             }
             throw new InvalidResponseException(String.format(
                     "%s. Command: %s, %s",
